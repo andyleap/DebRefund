@@ -81,7 +81,7 @@ namespace DebRefund
                     mass += p.mass;
                     cost += p.partInfo.cost;
 
-                    if (!PartCosts.ContainsKey(p.partName))
+                    if (!PartCosts.ContainsKey(p.partRef.partInfo.title))
                     {
                         PartCosts.Add(p.partRef.partInfo.title, p.partInfo.cost);
                         Parts.Add(p.partRef.partInfo.title, 0);
