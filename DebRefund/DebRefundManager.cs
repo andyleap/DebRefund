@@ -66,14 +66,12 @@ namespace DebRefund
 
                     if (!PartCosts.ContainsKey(p.partName))
                     {
-                        PartCosts.Add(p.partName, p.partInfo.cost);
-                        Parts.Add(p.partName, 0);
+                        PartCosts.Add(p.partRef.partInfo.title, p.partInfo.cost);
+                        Parts.Add(p.partRef.partInfo.title, 0);
                     }
-                    Parts[p.partName] += 1;
+                    Parts[p.partRef.partInfo.title] += 1;
 
                     print("DebRefund: " + p.partName);
-
-                    
 
                     if (RealChutes)
                     {
