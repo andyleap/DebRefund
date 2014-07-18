@@ -46,6 +46,23 @@ namespace DebRefund
             if (!HighLogic.LoadedSceneIsEditor && !v.isActiveVessel && (v.situation == Vessel.Situations.FLYING || v.situation == Vessel.Situations.SUB_ORBITAL) && v.orbit.referenceBody.bodyName.Equals("Kerbin") && (v.mainBody.GetAltitude(v.CoM) - (v.terrainAltitude < 0 ? 0 : v.terrainAltitude) > 10) && !nonAtmoKill)
             {
                 bool RealChutes = AssemblyLoader.loadedAssemblies.Any(a => a.name.Contains("RealChute"));
+                object MatLibraryInstance = null;
+                Type matLibraryType = null;
+                System.Reflection.MethodInfo matMethod = null;
+                System.Reflection.PropertyInfo matDragProp = null;
+                if (RealChutes)
+                {
+                    matLibraryType = AssemblyLoader.loadedAssemblies
+                        .SelectMany(a => a.assembly.GetExportedTypes())
+                        .SingleOrDefault(t => t.FullName == "RealChute.Libraries.MaterialsLibrary");
+                    matMethod = matLibraryType.GetMethod("GetMaterial", new Type[] { typeof(string) });
+                    MatLibraryInstance = matLibraryType.GetProperty("instance").GetValue(null, null);
+                    
+                    Type matDefType = AssemblyLoader.loadedAssemblies
+                        .SelectMany(a => a.assembly.GetExportedTypes())
+                        .SingleOrDefault(t => t.FullName == "RealChute.Libraries.MaterialDefinition");
+                    matDragProp = matDefType.GetProperty("dragCoefficient");
+                }
 
                 float drag = 0;
                 float mass = 0;
@@ -78,7 +95,20 @@ namespace DebRefund
                         ProtoPartModuleSnapshot pm = p.modules.FirstOrDefault(pms => pms.moduleName == "RealChuteModule");
                         if (pm != null)
                         {
-                            //CODE THE CODES AND CODE CODE CODE!
+                            ConfigNode[] parachutes = pm.moduleValues.GetNodes("PARACHUTE");
+                            foreach (ConfigNode chute in parachutes)
+                            {
+                                if (float.Parse(chute.GetValue("cutAlt")) < 0)
+                                {
+                                    float d = float.Parse(chute.GetValue("deployedDiameter"));
+                                    float area = Mathf.PI * Mathf.Pow(d / 2, 2);
+                                    string mat = chute.GetValue("material");
+                                    object matObj = matMethod.Invoke(MatLibraryInstance, new object[] { mat });
+                                    float dragC = (float)matDragProp.GetValue(matObj, null);
+
+                                    drag += dragC * area;
+                                }
+                            }
                         }
                     }
                     else
