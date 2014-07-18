@@ -1,6 +1,8 @@
 using System;
 using UnityEngine;
 using System.Linq;
+using System.Collections.Generic;
+using System.Text;
 
 namespace DebRefund
 {
@@ -43,11 +45,17 @@ namespace DebRefund
 
             if (!HighLogic.LoadedSceneIsEditor && !v.isActiveVessel && (v.situation == Vessel.Situations.FLYING || v.situation == Vessel.Situations.SUB_ORBITAL) && v.orbit.referenceBody.bodyName.Equals("Kerbin") && (v.mainBody.GetAltitude(v.CoM) - (v.terrainAltitude < 0 ? 0 : v.terrainAltitude) > 10) && !nonAtmoKill)
             {
-
+                bool RealChutes = AssemblyLoader.loadedAssemblies.Any(a => a.name.Contains("RealChute"));
 
                 float drag = 0;
                 float mass = 0;
                 float cost = 0;
+
+                Dictionary<string, float> Resources = new Dictionary<string, float>();
+                Dictionary<string, float> ResourceCosts = new Dictionary<string, float>();
+                Dictionary<string, int> Parts = new Dictionary<string, int>();
+                Dictionary<string, float> PartCosts = new Dictionary<string, float>();
+                
                 if (!v.packed)
                     foreach (Part p in v.Parts)
                         p.Pack();
@@ -55,14 +63,36 @@ namespace DebRefund
                 {
                     mass += p.mass;
                     cost += p.partInfo.cost;
-                    print("DebRefund: " + p.partName);
-                    ProtoPartModuleSnapshot pm = p.modules.FirstOrDefault(pms => pms.moduleName == "ModuleParachute");
-                    if (pm != null)
+
+                    if (!PartCosts.ContainsKey(p.partName))
                     {
-                        ModuleParachute mp = (ModuleParachute)pm.moduleRef;
-                        mp.Load(pm.moduleValues);
-                        drag += mp.fullyDeployedDrag * p.mass;
-                        print("DebRefund: " + " " + mp.fullyDeployedDrag + " " + mp.fullyDeployedDrag * p.mass);
+                        PartCosts.Add(p.partName, p.partInfo.cost);
+                        Parts.Add(p.partName, 0);
+                    }
+                    Parts[p.partName] += 1;
+
+                    print("DebRefund: " + p.partName);
+
+                    
+
+                    if (RealChutes)
+                    {
+                        ProtoPartModuleSnapshot pm = p.modules.FirstOrDefault(pms => pms.moduleName == "RealChuteModule");
+                        if (pm != null)
+                        {
+                            //CODE THE CODES AND CODE CODE CODE!
+                        }
+                    }
+                    else
+                    {
+                        ProtoPartModuleSnapshot pm = p.modules.FirstOrDefault(pms => pms.moduleName == "ModuleParachute");
+                        if (pm != null)
+                        {
+                            ModuleParachute mp = (ModuleParachute)pm.moduleRef;
+                            mp.Load(pm.moduleValues);
+                            drag += mp.fullyDeployedDrag * p.mass;
+                            print("DebRefund: " + " " + mp.fullyDeployedDrag + " " + mp.fullyDeployedDrag * p.mass);
+                        }
                     }
                     foreach (ProtoPartResourceSnapshot pr in p.resources)
                     {
@@ -71,6 +101,12 @@ namespace DebRefund
                             float amt = float.Parse(pr.resourceValues.GetValue("amount"));
                             cost += (float)amt * pr.resourceRef.info.unitCost;
                             mass += (float)amt * pr.resourceRef.info.density;
+                            if (!ResourceCosts.ContainsKey(pr.resourceName))
+                            {
+                                ResourceCosts.Add(pr.resourceName, pr.resourceRef.info.unitCost);
+                                Resources.Add(pr.resourceName, 0);
+                            }
+                            Resources[pr.resourceName] += amt;
                         }
 
                     }
@@ -78,15 +114,40 @@ namespace DebRefund
 
                 print("DebRefund: " + drag + " " + mass);
 
+
+                StringBuilder partlist = new StringBuilder();
+
+                partlist.AppendLine("Parts:");
+                foreach(var kvp in Parts)
+                {
+                    partlist.AppendFormat("{0} x {1} @ {2} = {3}", kvp.Value, kvp.Key, PartCosts[kvp.Key], PartCosts[kvp.Key] * kvp.Value);
+                    partlist.AppendLine();
+                }
+
+                if (Resources.Any(r => r.Value > 0))
+                {
+                    partlist.AppendLine("Resources:");
+                    foreach (var kvp in Resources.Where(r => r.Value > 0))
+                    {
+                        partlist.AppendFormat("{0} x {1} @ {2} = {3}", kvp.Value, kvp.Key, ResourceCosts[kvp.Key], ResourceCosts[kvp.Key] * kvp.Value);
+                        partlist.AppendLine();
+                    }
+                }
+
+
                 if (drag > mass * 70)
                 {
                     float recFactor = CalculateRecoveryFactor(v);
                     if (drag > mass * 90)
                     {
+                        StringBuilder Message = new StringBuilder();
+                        Message.AppendLine("Debris was landed safely");
+                        Message.Append(partlist.ToString());
+                        Message.AppendFormat("{0} refunded({1:P2})", recFactor * cost, recFactor);
                         Funding.Instance.Funds += recFactor * cost;
                         MessageSystem.Message m = new MessageSystem.Message(
                             "Debris landed safely",
-                            String.Format("Debris was landed safely, {0} refunded", recFactor * cost),
+                            Message.ToString(),
                             MessageSystemButton.MessageButtonColor.GREEN,
                             MessageSystemButton.ButtonIcons.MESSAGE);
                         MessageSystem.Instance.AddMessage(m);
@@ -94,10 +155,14 @@ namespace DebRefund
                     else
                     {
                         float damageFactor = Mathf.Lerp(0.9f, 0.5f, Mathf.InverseLerp(mass * 90, mass * 70, drag));
+                        StringBuilder Message = new StringBuilder();
+                        Message.AppendLine("Debris was landed with some damage");
+                        Message.Append(partlist.ToString());
+                        Message.AppendFormat("{0} refunded({1:P2})", recFactor * cost * damageFactor, recFactor * damageFactor);
                         Funding.Instance.Funds += recFactor * cost * damageFactor;
                         MessageSystem.Message m = new MessageSystem.Message(
                             "Debris landed",
-                            String.Format("Debris was landed with some damage, {0} refunded", recFactor * cost * damageFactor),
+                            Message.ToString(),
                             MessageSystemButton.MessageButtonColor.YELLOW,
                             MessageSystemButton.ButtonIcons.ALERT);
                         MessageSystem.Instance.AddMessage(m);
@@ -106,9 +171,12 @@ namespace DebRefund
                 }
                 else
                 {
+                    StringBuilder Message = new StringBuilder();
+                    Message.AppendLine("Debris hit hard, sorry, nothing to be salvaged");
+                    Message.Append(partlist.ToString());
                     MessageSystem.Message m = new MessageSystem.Message(
                         "Debris hit HARD",
-                        String.Format("Debris hit hard, sorry, nothing to be salvaged"),
+                        Message.ToString(),
                         MessageSystemButton.MessageButtonColor.RED,
                         MessageSystemButton.ButtonIcons.ALERT);
                     MessageSystem.Instance.AddMessage(m);
