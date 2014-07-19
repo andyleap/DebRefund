@@ -32,6 +32,15 @@ namespace DebRefund
             {
                 return;
             }
+            if (!v.mainBody.bodyName.Contains("Kerbin"))
+            {
+                return;
+            }
+
+            if((FlightGlobals.getAltitudeAtPos(v.transform.position, v.mainBody)) <= 0.01)
+            {
+                return;
+            }
 
             bool nonAtmoKill = false;
             if (FlightGlobals.ActiveVessel != null)
@@ -44,7 +53,9 @@ namespace DebRefund
                 }
             }
 
-            if (!HighLogic.LoadedSceneIsEditor && !v.isActiveVessel && (v.situation == Vessel.Situations.FLYING || v.situation == Vessel.Situations.SUB_ORBITAL) && v.orbit.referenceBody.bodyName.Equals("Kerbin") && (v.mainBody.GetAltitude(v.CoM) - (v.terrainAltitude < 0 ? 0 : v.terrainAltitude) > 10) && !nonAtmoKill)
+            
+
+            if (!HighLogic.LoadedSceneIsEditor && !v.isActiveVessel && (v.situation == Vessel.Situations.FLYING || v.situation == Vessel.Situations.SUB_ORBITAL) && (v.mainBody.GetAltitude(v.CoM) - (v.terrainAltitude < 0 ? 0 : v.terrainAltitude) > 10) && !nonAtmoKill)
             {
                 bool RealChutes = AssemblyLoader.loadedAssemblies.Any(a => a.name.Contains("RealChute"));
                 object MatLibraryInstance = null;
@@ -92,8 +103,6 @@ namespace DebRefund
                     }
                     Parts[p.partInfo.title] += 1;
 
-                    print("DebRefund: " + p.partName);
-
                     if (RealChutes)
                     {
                         ProtoPartModuleSnapshot pm = p.modules.FirstOrDefault(pms => pms.moduleName == "RealChuteModule");
@@ -120,22 +129,20 @@ namespace DebRefund
                         ProtoPartModuleSnapshot pm = p.modules.FirstOrDefault(pms => pms.moduleName == "ModuleParachute");
                         if (pm != null)
                         {
-                            ModuleParachute mp = (ModuleParachute)pm.moduleRef;
-                            mp.Load(pm.moduleValues);
-                            drag += mp.fullyDeployedDrag * p.mass;
-                            print("DebRefund: " + " " + mp.fullyDeployedDrag + " " + mp.fullyDeployedDrag * p.mass);
+                            drag += float.Parse(pm.moduleValues.GetValue("fullyDeployedDrag")) * p.mass;
                         }
                     }
                     foreach (ProtoPartResourceSnapshot pr in p.resources)
                     {
                         if (pr.resourceValues.HasValue("amount"))
                         {
+                            PartResourceDefinition prd = PartResourceLibrary.Instance.resourceDefinitions[pr.resourceName];
                             float amt = float.Parse(pr.resourceValues.GetValue("amount"));
-                            cost += (float)amt * pr.resourceRef.info.unitCost;
-                            mass += (float)amt * pr.resourceRef.info.density;
+                            cost += (float)amt * prd.unitCost;
+                            mass += (float)amt * prd.density;
                             if (!ResourceCosts.ContainsKey(pr.resourceName))
                             {
-                                ResourceCosts.Add(pr.resourceName, pr.resourceRef.info.unitCost);
+                                ResourceCosts.Add(pr.resourceName, prd.unitCost);
                                 Resources.Add(pr.resourceName, 0);
                             }
                             Resources[pr.resourceName] += amt;
@@ -236,10 +243,13 @@ namespace DebRefund
         public List<String> RecoverKerbals(Vessel v)
         {
             List<String> crew = new List<string>();
-            foreach (ProtoCrewMember pcm in v.protoVessel.GetVesselCrew())
+            if (v.protoVessel != null)
             {
-                pcm.rosterStatus = ProtoCrewMember.RosterStatus.Available;
-                crew.Add(pcm.KerbalRef.crewMemberName);
+                foreach (ProtoCrewMember pcm in v.protoVessel.GetVesselCrew())
+                {
+                    pcm.rosterStatus = ProtoCrewMember.RosterStatus.Available;
+                    crew.Add(pcm.KerbalRef.crewMemberName);
+                }
             }
             return crew;
         }
@@ -251,7 +261,6 @@ namespace DebRefund
             {
                 foreach (ProtoPartModuleSnapshot pm in p.modules)
                 {
-                    Debug.Log("DebRefund: " + pm.moduleValues.HasNode("ScienceData"));
                     foreach (ConfigNode sciNode in pm.moduleValues.GetNodes("ScienceData"))
                     {
                         ScienceData sci = new ScienceData(sciNode);
