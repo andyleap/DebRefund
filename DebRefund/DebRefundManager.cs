@@ -14,19 +14,14 @@ namespace DebRefund
             DontDestroyOnLoad(this);
 
             print("DebRefund Awake");
-            GameEvents.onVesselGoOnRails.Add(this.onVesselGoOnRails);
             GameEvents.onVesselDestroy.Add(this.onVesselDestroy);
+            
         }
 
         public void OnDestroy()
         {
             print("DebRefund Destroy");
-        }
-
-        public void onVesselGoOnRails(Vessel v)
-        {
-            //ShipConstruction.FindVesselsAtLaunchSite(
-
+            GameEvents.onVesselDestroy.Remove(this.onVesselDestroy);
         }
 
         public void onVesselDestroy(Vessel v)
@@ -169,11 +164,11 @@ namespace DebRefund
                 }
 
 
-                if (drag > mass * 70)
+                if (drag > mass * Settings.Instance.DragNeededYellow)
                 {
                     List<String> crew = RecoverKerbals(v);
                     float recFactor = CalculateRecoveryFactor(v);
-                    if (drag > mass * 90)
+                    if (drag > mass * Settings.Instance.DragNeededGreen)
                     {
                         float Science = RecoverScience(v, 0.95f);
                         StringBuilder Message = new StringBuilder();
