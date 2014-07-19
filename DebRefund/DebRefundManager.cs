@@ -14,13 +14,19 @@ namespace DebRefund
             DontDestroyOnLoad(this);
 
             print("DebRefund Awake");
-
+            GameEvents.onVesselGoOnRails.Add(this.onVesselGoOnRails);
             GameEvents.onVesselDestroy.Add(this.onVesselDestroy);
         }
 
         public void OnDestroy()
         {
             print("DebRefund Destroy");
+        }
+
+        public void onVesselGoOnRails(Vessel v)
+        {
+            //ShipConstruction.FindVesselsAtLaunchSite(
+
         }
 
         public void onVesselDestroy(Vessel v)
@@ -165,13 +171,22 @@ namespace DebRefund
 
                 if (drag > mass * 70)
                 {
+                    List<String> crew = RecoverKerbals(v);
                     float recFactor = CalculateRecoveryFactor(v);
                     if (drag > mass * 90)
                     {
+                        float Science = RecoverScience(v, 0.95f);
                         StringBuilder Message = new StringBuilder();
                         Message.AppendLine("Debris was landed safely");
                         Message.Append(partlist.ToString());
                         Message.AppendFormat("{0} refunded({1:P2})", recFactor * cost, recFactor);
+                        Message.AppendLine();
+                        Message.AppendFormat("Science Recovered: {0}(95%)", Science);
+                        Message.AppendLine();
+                        foreach (string member in crew)
+                        {
+                            Message.AppendLine(member + " Recovered");
+                        }
                         Funding.Instance.Funds += recFactor * cost;
                         MessageSystem.Message m = new MessageSystem.Message(
                             "Debris landed safely",
@@ -183,11 +198,19 @@ namespace DebRefund
                     else
                     {
                         float damageFactor = Mathf.Lerp(0.9f, 0.5f, Mathf.InverseLerp(mass * 90, mass * 70, drag));
+                        float Science = RecoverScience(v, damageFactor);
                         StringBuilder Message = new StringBuilder();
                         Message.AppendLine("Debris was landed with some damage");
                         Message.Append(partlist.ToString());
                         Message.AppendFormat("{0} refunded({1:P2})", recFactor * cost * damageFactor, recFactor * damageFactor);
                         Funding.Instance.Funds += recFactor * cost * damageFactor;
+                        Message.AppendLine();
+                        Message.AppendFormat("Science Recovered: {0}({1:P2})", Science, damageFactor);
+                        Message.AppendLine();
+                        foreach (string member in crew)
+                        {
+                            Message.AppendLine(member + " Recovered");
+                        }
                         MessageSystem.Message m = new MessageSystem.Message(
                             "Debris landed",
                             Message.ToString(),
@@ -195,7 +218,7 @@ namespace DebRefund
                             MessageSystemButton.ButtonIcons.ALERT);
                         MessageSystem.Instance.AddMessage(m);
                     }
-
+                    
                 }
                 else
                 {
@@ -210,6 +233,38 @@ namespace DebRefund
                     MessageSystem.Instance.AddMessage(m);
                 }
             }
+        }
+
+        public List<String> RecoverKerbals(Vessel v)
+        {
+            List<String> crew = new List<string>();
+            foreach (ProtoCrewMember pcm in v.protoVessel.GetVesselCrew())
+            {
+                pcm.rosterStatus = ProtoCrewMember.RosterStatus.Available;
+                crew.Add(pcm.KerbalRef.crewMemberName);
+            }
+            return crew;
+        }
+
+        public float RecoverScience(Vessel v, float Damage)
+        {
+            float SciRecovered = 0f;
+            foreach (ProtoPartSnapshot p in v.protoVessel.protoPartSnapshots)
+            {
+                foreach (ProtoPartModuleSnapshot pm in p.modules)
+                {
+                    Debug.Log("DebRefund: " + pm.moduleValues.HasNode("ScienceData"));
+                    foreach (ConfigNode sciNode in pm.moduleValues.GetNodes("ScienceData"))
+                    {
+                        ScienceData sci = new ScienceData(sciNode);
+
+                        ScienceSubject sciSub = ResearchAndDevelopment.GetSubjectByID(sci.subjectID);
+
+                        SciRecovered += ResearchAndDevelopment.Instance.SubmitScienceData(sci.dataAmount, sciSub, Damage);
+                    }
+                }
+            }
+            return SciRecovered;
         }
 
         public float CalculateRecoveryFactor(Vessel v)
