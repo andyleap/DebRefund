@@ -32,10 +32,23 @@ namespace DebRefund
             {
                 return;
             }
+
             if (!v.mainBody.bodyName.Contains("Kerbin"))
             {
                 return;
             }
+
+            if (!v.packed)
+            {
+                return;
+            }
+
+            if (v.state != Vessel.State.DEAD)
+            {
+                return;
+            }
+
+
 
             if((FlightGlobals.getAltitudeAtPos(v.transform.position, v.mainBody)) <= 0.01)
             {
@@ -52,8 +65,6 @@ namespace DebRefund
                     nonAtmoKill = true;
                 }
             }
-
-            
 
             if (!HighLogic.LoadedSceneIsEditor && !v.isActiveVessel && (v.situation == Vessel.Situations.FLYING || v.situation == Vessel.Situations.SUB_ORBITAL) && (v.mainBody.GetAltitude(v.CoM) - (v.terrainAltitude < 0 ? 0 : v.terrainAltitude) > 10) && !nonAtmoKill)
             {
@@ -85,9 +96,6 @@ namespace DebRefund
                 Dictionary<string, int> Parts = new Dictionary<string, int>();
                 Dictionary<string, float> PartCosts = new Dictionary<string, float>();
                 
-                if (!v.packed)
-                    foreach (Part p in v.Parts)
-                        p.Pack();
                 foreach (ProtoPartSnapshot p in v.protoVessel.protoPartSnapshots)
                 {
                     mass += p.mass;
@@ -129,7 +137,8 @@ namespace DebRefund
                         ProtoPartModuleSnapshot pm = p.modules.FirstOrDefault(pms => pms.moduleName == "ModuleParachute");
                         if (pm != null)
                         {
-                            drag += float.Parse(pm.moduleValues.GetValue("fullyDeployedDrag")) * p.mass;
+                            ModuleParachute mp = (ModuleParachute)pm.moduleRef;
+                            drag += mp.fullyDeployedDrag * p.mass;
                         }
                     }
                     foreach (ProtoPartResourceSnapshot pr in p.resources)
@@ -199,6 +208,8 @@ namespace DebRefund
                             MessageSystemButton.MessageButtonColor.GREEN,
                             MessageSystemButton.ButtonIcons.MESSAGE);
                         MessageSystem.Instance.AddMessage(m);
+
+                        
                     }
                     else
                     {
