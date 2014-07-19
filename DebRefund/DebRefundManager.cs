@@ -80,14 +80,17 @@ namespace DebRefund
                 foreach (ProtoPartSnapshot p in v.protoVessel.protoPartSnapshots)
                 {
                     mass += p.mass;
-                    cost += p.partInfo.cost;
+                    float dryCost;
+                    float fuelCost;
+                    ShipConstruction.GetPartCosts(p, p.partInfo, out dryCost, out fuelCost);
+                    cost += dryCost;
 
-                    if (!PartCosts.ContainsKey(p.partRef.partInfo.title))
+                    if (!PartCosts.ContainsKey(p.partInfo.title))
                     {
-                        PartCosts.Add(p.partRef.partInfo.title, p.partInfo.cost);
-                        Parts.Add(p.partRef.partInfo.title, 0);
+                        PartCosts.Add(p.partInfo.title, dryCost);
+                        Parts.Add(p.partInfo.title, 0);
                     }
-                    Parts[p.partRef.partInfo.title] += 1;
+                    Parts[p.partInfo.title] += 1;
 
                     print("DebRefund: " + p.partName);
 
