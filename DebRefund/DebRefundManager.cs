@@ -3,19 +3,42 @@ using UnityEngine;
 using System.Linq;
 using System.Collections.Generic;
 using System.Text;
+using System.Reflection;
 
 namespace DebRefund
 {
     [KSPAddon(KSPAddon.Startup.SpaceCentre, true)]
     public class DebRefundManager : MonoBehaviour
     {
+        public bool check = false;
+
         public void Awake()
         {
             DontDestroyOnLoad(this);
 
             print("DebRefund Awake");
             GameEvents.onVesselDestroy.Add(this.onVesselDestroy);
-            
+
+        }
+
+        public void Update()
+        {
+            if (!check && MessageSystem.Ready)
+            {
+                check = true;
+                var latest = KSVersionCheck.Check.CheckVersion(57);
+
+                if (latest.friendly_version != Assembly.GetExecutingAssembly().GetName().Version.ToString(3))
+                {
+                    MessageSystem.Instance.AddMessage(new MessageSystem.Message(
+                        "New DebRefund Version",
+                        "There is a new DebRefund Version Available\nCurrent Version: " + Assembly.GetExecutingAssembly().GetName().Version.ToString(3) + "\nNew Version: " + latest.friendly_version + "\nChanges:\n" + latest.changelog + "\nGo to http://beta.kerbalstuff.com/mod/57",
+                        MessageSystemButton.MessageButtonColor.ORANGE,
+                        MessageSystemButton.ButtonIcons.ALERT
+                        ));
+
+                }
+            }
         }
 
         public void OnDestroy()
@@ -48,9 +71,7 @@ namespace DebRefund
                 return;
             }
 
-
-
-            if((FlightGlobals.getAltitudeAtPos(v.transform.position, v.mainBody)) <= 0.01)
+            if ((FlightGlobals.getAltitudeAtPos(v.transform.position, v.mainBody)) <= 0.01)
             {
                 return;
             }
@@ -80,7 +101,7 @@ namespace DebRefund
                         .SingleOrDefault(t => t.FullName == "RealChute.Libraries.MaterialsLibrary");
                     matMethod = matLibraryType.GetMethod("GetMaterial", new Type[] { typeof(string) });
                     MatLibraryInstance = matLibraryType.GetProperty("instance").GetValue(null, null);
-                    
+
                     Type matDefType = AssemblyLoader.loadedAssemblies
                         .SelectMany(a => a.assembly.GetExportedTypes())
                         .SingleOrDefault(t => t.FullName == "RealChute.Libraries.MaterialDefinition");
@@ -95,12 +116,13 @@ namespace DebRefund
                 Dictionary<string, float> ResourceCosts = new Dictionary<string, float>();
                 Dictionary<string, int> Parts = new Dictionary<string, int>();
                 Dictionary<string, float> PartCosts = new Dictionary<string, float>();
-                
+
                 foreach (ProtoPartSnapshot p in v.protoVessel.protoPartSnapshots)
                 {
                     mass += p.mass;
                     float dryCost;
                     float fuelCost;
+                    bool RealChute = false;
                     ShipConstruction.GetPartCosts(p, p.partInfo, out dryCost, out fuelCost);
                     cost += dryCost;
 
@@ -111,36 +133,34 @@ namespace DebRefund
                     }
                     Parts[p.partInfo.title] += 1;
 
-                    if (RealChutes)
+                    
+                    ProtoPartModuleSnapshot pm = p.modules.FirstOrDefault(pms => pms.moduleName == "RealChuteModule");
+                    if (pm != null)
                     {
-                        ProtoPartModuleSnapshot pm = p.modules.FirstOrDefault(pms => pms.moduleName == "RealChuteModule");
-                        if (pm != null)
+                        RealChute = true;
+                        ConfigNode[] parachutes = pm.moduleValues.GetNodes("PARACHUTE");
+                        foreach (ConfigNode chute in parachutes)
                         {
-                            ConfigNode[] parachutes = pm.moduleValues.GetNodes("PARACHUTE");
-                            foreach (ConfigNode chute in parachutes)
+                            if (float.Parse(chute.GetValue("cutAlt")) < 0)
                             {
-                                if (float.Parse(chute.GetValue("cutAlt")) < 0)
-                                {
-                                    float d = float.Parse(chute.GetValue("deployedDiameter"));
-                                    float area = Mathf.PI * Mathf.Pow(d / 2, 2);
-                                    string mat = chute.GetValue("material");
-                                    object matObj = matMethod.Invoke(MatLibraryInstance, new object[] { mat });
-                                    float dragC = (float)matDragProp.GetValue(matObj, null);
+                                float d = float.Parse(chute.GetValue("deployedDiameter"));
+                                float area = Mathf.PI * Mathf.Pow(d / 2, 2);
+                                string mat = chute.GetValue("material");
+                                object matObj = matMethod.Invoke(MatLibraryInstance, new object[] { mat });
+                                float dragC = (float)matDragProp.GetValue(matObj, null);
 
-                                    drag += dragC * area;
-                                }
+                                drag += dragC * area * (1/16198.8680f);
                             }
                         }
                     }
-                    else
+
+                    pm = p.modules.FirstOrDefault(pms => pms.moduleName == "ModuleParachute");
+                    if (pm != null && !RealChute)
                     {
-                        ProtoPartModuleSnapshot pm = p.modules.FirstOrDefault(pms => pms.moduleName == "ModuleParachute");
-                        if (pm != null)
-                        {
-                            ModuleParachute mp = (ModuleParachute)pm.moduleRef;
-                            drag += mp.fullyDeployedDrag * p.mass;
-                        }
+                        ModuleParachute mp = (ModuleParachute)pm.moduleRef;
+                        drag += mp.fullyDeployedDrag * p.mass * (1/2317.4596f);
                     }
+
                     foreach (ProtoPartResourceSnapshot pr in p.resources)
                     {
                         if (pr.resourceValues.HasValue("amount"))
@@ -166,7 +186,7 @@ namespace DebRefund
                 StringBuilder partlist = new StringBuilder();
 
                 partlist.AppendLine("Parts:");
-                foreach(var kvp in Parts)
+                foreach (var kvp in Parts)
                 {
                     partlist.AppendFormat("{0} x {1} @ {2} = {3}", kvp.Value, kvp.Key, PartCosts[kvp.Key], PartCosts[kvp.Key] * kvp.Value);
                     partlist.AppendLine();
@@ -182,16 +202,20 @@ namespace DebRefund
                     }
                 }
 
-
-                if (drag > mass * Settings.Instance.DragNeededYellow)
+                float TouchDown = 100;
+                if (drag > 0)
+                {
+                    TouchDown = Mathf.Sqrt(mass / drag);
+                }
+                if (TouchDown < Settings.Instance.MinimumSpeedYellow)
                 {
                     List<String> crew = RecoverKerbals(v);
                     float recFactor = CalculateRecoveryFactor(v);
-                    if (drag > mass * Settings.Instance.DragNeededGreen)
+                    if (TouchDown < Settings.Instance.MinimumSpeedGreen)
                     {
                         float Science = RecoverScience(v, 0.95f);
                         StringBuilder Message = new StringBuilder();
-                        Message.AppendLine("Debris was landed safely");
+                        Message.AppendLine("Debris was landed safely at " + TouchDown.ToString("N2") + "m/s");
                         Message.Append(partlist.ToString());
                         Message.AppendFormat("{0} refunded({1:P2})", recFactor * cost, recFactor);
                         Message.AppendLine();
@@ -209,14 +233,14 @@ namespace DebRefund
                             MessageSystemButton.ButtonIcons.MESSAGE);
                         MessageSystem.Instance.AddMessage(m);
 
-                        
+
                     }
                     else
                     {
-                        float damageFactor = Mathf.Lerp(0.9f, 0.5f, Mathf.InverseLerp(mass * 90, mass * 70, drag));
+                        float damageFactor = Mathf.Lerp(Settings.Instance.YellowMaxPercent / 100, Settings.Instance.YellowMinPercent / 100, Mathf.InverseLerp(Settings.Instance.MinimumSpeedYellow, Settings.Instance.MinimumSpeedGreen, drag));
                         float Science = RecoverScience(v, damageFactor);
                         StringBuilder Message = new StringBuilder();
-                        Message.AppendLine("Debris was landed with some damage");
+                        Message.AppendLine("Debris was landed at " + TouchDown.ToString("N2") + "m/s");
                         Message.Append(partlist.ToString());
                         Message.AppendFormat("{0} refunded({1:P2})", recFactor * cost * damageFactor, recFactor * damageFactor);
                         Funding.Instance.Funds += recFactor * cost * damageFactor;
@@ -234,12 +258,12 @@ namespace DebRefund
                             MessageSystemButton.ButtonIcons.ALERT);
                         MessageSystem.Instance.AddMessage(m);
                     }
-                    
+
                 }
                 else
                 {
                     StringBuilder Message = new StringBuilder();
-                    Message.AppendLine("Debris hit hard, sorry, nothing to be salvaged");
+                    Message.AppendLine("Debris hit hard at " + TouchDown.ToString("N2") + "m/s, nothing to be salvaged");
                     Message.Append(partlist.ToString());
                     MessageSystem.Message m = new MessageSystem.Message(
                         "Debris hit HARD",
@@ -291,7 +315,7 @@ namespace DebRefund
             double dist = SpaceCenter.Instance.GreatCircleDistance(cb.GetRelSurfaceNVector(v.latitude, v.longitude));
             double max = cb.Radius * Math.PI;
 
-            return Mathf.Lerp(0.88f, 0.9f, (float)(dist / max));
+            return Mathf.Lerp(0.98f * (Settings.Instance.SafeRecoveryPercent/100), 0.1f * (Settings.Instance.SafeRecoveryPercent/100), (float)(dist / max));
 
         }
     }

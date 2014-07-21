@@ -22,14 +22,23 @@ namespace DebRefund
         private static Settings _instance;
         protected String filePath = KSPUtil.ApplicationRootPath + "GameData/DebRefund/Config.txt";
         [Persistent]
-        public float DragNeededGreen;
+        public float MinimumSpeedGreen;
         [Persistent]
-        public float DragNeededYellow;
+        public float MinimumSpeedYellow;
+        [Persistent]
+        public float SafeRecoveryPercent;
+        [Persistent]
+        public float YellowMaxPercent;
+        [Persistent]
+        public float YellowMinPercent;
 
         public Settings()
         {
-            DragNeededGreen = 90;
-            DragNeededYellow = 70;
+            MinimumSpeedGreen = 6;
+            MinimumSpeedYellow = 10;
+            SafeRecoveryPercent = 90;
+            YellowMaxPercent = 90;
+            YellowMinPercent = 40;
         }
 
         public void Load()
