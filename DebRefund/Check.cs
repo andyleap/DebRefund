@@ -14,17 +14,22 @@ namespace KSVersionCheck
         public string ksp_version;
         public string changelog;
     }
+    
     public class Check
     {
-        public static Version CheckVersion(int ModID)
+        public static void CheckVersion(int ModID, Action<Version> action)
         {
             WebClient wc = new WebClient();
 
-            string versionjson = wc.DownloadString("http://beta.kerbalstuff.com/api/mod/" + ModID.ToString() + "/latest_version");
+            wc.DownloadStringCompleted += (sender, e) =>
+            {
+                Dictionary<string, object> data = Json.Deserialize(e.Result) as Dictionary<string, object>;
 
-            Dictionary<string, object> data = Json.Deserialize(versionjson) as Dictionary<string, object>;
+                Version v = new Version { download_path = (string)data["download_path"], friendly_version = (string)data["friendly_version"], ksp_version = (string)data["ksp_version"], changelog = (string)data["changelog"] };
 
-            return new Version {download_path = (string)data["download_path"], friendly_version = (string)data["friendly_version"], ksp_version = (string)data["ksp_version"], changelog = (string)data["changelog"]};
+                action(v);
+            };
+            wc.DownloadStringAsync(new Uri("http://beta.kerbalstuff.com/api/mod/" + ModID.ToString() + "/latest_version"));
         }
     }
 }

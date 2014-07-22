@@ -26,18 +26,21 @@ namespace DebRefund
             if (!check && MessageSystem.Ready)
             {
                 check = true;
-                var latest = KSVersionCheck.Check.CheckVersion(57);
-
-                if (latest.friendly_version != Assembly.GetExecutingAssembly().GetName().Version.ToString(3))
+                KSVersionCheck.Check.CheckVersion(57, latest =>
                 {
-                    MessageSystem.Instance.AddMessage(new MessageSystem.Message(
-                        "New DebRefund Version",
-                        "There is a new DebRefund Version Available\nCurrent Version: " + Assembly.GetExecutingAssembly().GetName().Version.ToString(3) + "\nNew Version: " + latest.friendly_version + "\nChanges:\n" + latest.changelog + "\nGo to http://beta.kerbalstuff.com/mod/57",
-                        MessageSystemButton.MessageButtonColor.ORANGE,
-                        MessageSystemButton.ButtonIcons.ALERT
-                        ));
+                    if (latest.friendly_version != Assembly.GetExecutingAssembly().GetName().Version.ToString(3))
+                    {
+                        MessageSystem.Instance.AddMessage(new MessageSystem.Message(
+                            "New DebRefund Version",
+                            "There is a new DebRefund Version Available\nCurrent Version: " + Assembly.GetExecutingAssembly().GetName().Version.ToString(3) + "\nNew Version: " + latest.friendly_version + "\nChanges:\n" + latest.changelog + "\nGo to http://beta.kerbalstuff.com/mod/57 to download",
+                            MessageSystemButton.MessageButtonColor.ORANGE,
+                            MessageSystemButton.ButtonIcons.ALERT
+                            ));
 
-                }
+                    }
+                });
+
+                
             }
         }
 
