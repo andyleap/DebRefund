@@ -31,6 +31,8 @@ namespace DebRefund
         public float YellowMaxPercent;
         [Persistent]
         public float YellowMinPercent;
+        [Persistent]
+        public bool UpdateCheck;
 
         public Settings()
         {
@@ -39,6 +41,7 @@ namespace DebRefund
             SafeRecoveryPercent = 90;
             YellowMaxPercent = 90;
             YellowMinPercent = 40;
+            UpdateCheck = false;
         }
 
         public void Load()

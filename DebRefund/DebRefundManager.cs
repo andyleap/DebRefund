@@ -16,14 +16,13 @@ namespace DebRefund
         {
             DontDestroyOnLoad(this);
 
-            print("DebRefund Awake");
+            print("DebRefund v" + Assembly.GetExecutingAssembly().GetName().Version.ToString(3) + "Awake");
             GameEvents.onVesselDestroy.Add(this.onVesselDestroy);
-
         }
 
         public void Update()
         {
-            if (!check && MessageSystem.Ready)
+            if (Settings.Instance.UpdateCheck && !check && MessageSystem.Ready)
             {
                 check = true;
                 KSVersionCheck.Check.CheckVersion(57, latest =>

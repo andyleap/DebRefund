@@ -29,7 +29,7 @@ namespace KSVersionCheck
 
                 action(v);
             };
-            wc.DownloadStringAsync(new Uri("http://beta.kerbalstuff.com/api/mod/" + ModID.ToString() + "/latest_version"));
+            wc.DownloadStringAsync(new Uri("http://beta.kerbalstuff.com/api/mod/" + ModID.ToString() + "/latest"));
         }
     }
 }
