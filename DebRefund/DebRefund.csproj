@@ -31,26 +31,58 @@
     <ConsolePause>false</ConsolePause>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="Assembly-CSharp-firstpass, Version=0.0.0.0, Culture=neutral, processorArchitecture=MSIL">
-      <SpecificVersion>False</SpecificVersion>
+    <Reference Include="Assembly-CSharp">
+      <HintPath>..\..\SteamLibrary\SteamApps\common\Kerbal Space Program\KSP_Data\Managed\Assembly-CSharp.dll</HintPath>
+    </Reference>
+    <Reference Include="Assembly-CSharp-firstpass">
       <HintPath>..\..\SteamLibrary\SteamApps\common\Kerbal Space Program\KSP_Data\Managed\Assembly-CSharp-firstpass.dll</HintPath>
     </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core" />
-    <Reference Include="Assembly-CSharp">
-      <HintPath>..\..\..\.steam\steam\SteamApps\common\Kerbal Space Program\KSP_Data\Managed\Assembly-CSharp.dll</HintPath>
-    </Reference>
     <Reference Include="UnityEngine">
-      <HintPath>..\..\..\.steam\steam\SteamApps\common\Kerbal Space Program\KSP_Data\Managed\UnityEngine.dll</HintPath>
+      <HintPath>..\..\SteamLibrary\SteamApps\common\Kerbal Space Program\KSP_Data\Managed\UnityEngine.dll</HintPath>
     </Reference>
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Check.cs" />
     <Compile Include="DebRefundSettings.cs" />
+    <Compile Include="Debug.cs" />
     <Compile Include="MiniJSON.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="DebRefundManager.cs" />
     <Compile Include="Settings.cs" />
   </ItemGroup>
   <Import Project="$(MSBuildBinPath)\Microsoft.CSharp.targets" />
+  <PropertyGroup>
+    <PostBuildEvent>rem Set the Variables we need
+echo Finding KSP
+if exist "G:\kspdev\KSP.exe" (
+	set GAMEPATH=G:\kspdev
+)else (
+	echo "Cant find KSP"
+	exit 1
+)
+
+echo Gamepath: %25GAMEPATH%25
+set DestPath="%25GAMEPATH%25\GameData\DebRefund"
+set Binary="%25GAMEPATH%25\KSP.exe"
+set StartX="%25GAMEPATH%25\StartX.exe"
+
+if not $(ConfigurationName)==Debug goto PACKAGE
+:DEBUGCONFIG
+rem Copy DLL and run KSP
+copy "$(TargetPath)" "%25DestPath%25"
+rem and then run the game
+
+%25StartX%25 "KSP" %25Binary%25
+
+goto END
+
+:PACKAGE
+
+copy "$(TargetPath)" "$(SolutionDir)package\DebRefund"
+copy "$(SolutionDir)LICENSE" "$(SolutionDir)package\DebRefund"
+
+:END</PostBuildEvent>
+  </PropertyGroup>
 </Project>
