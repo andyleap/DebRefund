@@ -262,7 +262,7 @@ namespace DebRefund
                         {
                             Message.AppendLine(member + " Recovered");
                         }
-                        Funding.Instance.Funds += recFactor * cost;
+                        Funding.Instance.AddFunds(recFactor * cost, TransactionReasons.VesselRecovery);
                         MessageSystem.Message m = new MessageSystem.Message(
                             "Debris landed safely",
                             Message.ToString(),
@@ -280,7 +280,7 @@ namespace DebRefund
                         Message.AppendLine("Debris was landed at " + TouchDown.ToString("N2") + "m/s");
                         Message.Append(partlist.ToString());
                         Message.AppendFormat("{0} refunded({1:P2})", recFactor * cost * damageFactor, recFactor * damageFactor);
-                        Funding.Instance.Funds += recFactor * cost * damageFactor;
+                        Funding.Instance.AddFunds(recFactor * cost * damageFactor, TransactionReasons.VesselRecovery);
                         Message.AppendLine();
                         Message.AppendFormat("Science Recovered: {0}({1:P2})", Science, damageFactor);
                         Message.AppendLine();
